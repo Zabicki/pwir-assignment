@@ -18,7 +18,7 @@ init() ->
 
 listen() ->
 	receive
-		{target_level} -> set_level(target_level), listen()
+		{TargetLevel} -> set_level(TargetLevel), listen()
 	end.
 
 
@@ -27,37 +27,55 @@ level() ->
 	Level.
 
 
-set_level(target_level) ->
-	ets:insert(name(), {level, target_level}).
+set_level(TargetLevel) ->
+	ets:insert(name(), {level, TargetLevel}).
 
 
 % przeslanie stanu zaluzji do glownego watku
 send_message_to_main(Pid, Level) ->
 	receive
-		
 		after 1000 ->
 			Pid ! {Level}
 	end.
 
 
 % zmiana stanu zaluzji
-move(target_level) ->
+move(TargetLevel) ->
 	receive
 		after 1000 ->
-			io:write("")
-		% to do 
-	end.
+			
+			if 
+				level > TargetLevel ->   
+					level = level - 6;
+					
+					if 
+						level < TargetLevel ->
+							level = TargetLevel
+					end;
+			   
+			if
+				level < TargetLevel ->
+					level = Level + 6;
+					
+					if 
+						level > TargetLevel ->
+							level = TargetLevel
+					end;
+					
+			move(TargetLevel)
+	
+  end.
 
 
 % glowna funkcja - sprawdzenie i zmiana stanu zaluzji
-check_and_move_level(target_level, Level) ->
+check_and_move_level(TargetLevel, level) ->
 	if 
-		target_level == Level ->
+		TargetLevel == level ->
 			io:write("Blinds are currently on that level");
 		
-		target_level >= 0 -> 
+		TargetLevel >= 0 -> 
 			io:write(""),
-			move(target_level);
+			move(TargetLevel);
 	
 		true ->
 			io:fwrite("Enter blind level within the range (0 - 100)")
