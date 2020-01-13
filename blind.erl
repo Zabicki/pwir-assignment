@@ -1,6 +1,7 @@
 -module(blind).
 
 -define(BLIND_LEVEL, 0).
+-define(BLIND_CHANGE, 1).
 
 -export([init/0]).
 
@@ -13,12 +14,28 @@ init() ->
 	ets:new(name(), [set, named_table]),
 	ets:insert(name(), {blind_level, 0}),
 	timer:send_interval(1000, self(), {move, ok}),
-	listen().
+	loop().
 
 
-listen() ->
+loop() -> %main function
 	receive
-		{TargetLevel} -> set_level(TargetLevel), listen()
+		{shut} -> 
+			move(100),
+			loop();
+		{raise} ->
+			move(0),
+			loop();
+		{getStatus} ->
+			io:format(level()),
+			loop();
+		{Value} ->
+			io:format(lists:flatten(io_lib:format("~p",[Value]))),
+			move(Value),
+			loop();
+		{getLevel, PidMain} ->
+			Val = ets:lookup(name(), blind_level),
+			PidMain ! {blindLevel, Val},
+			loop()
 	end.
 
 
@@ -27,58 +44,36 @@ level() ->
 	Level.
 
 
-set_level(TargetLevel) ->
-	ets:insert(name(), {level, TargetLevel}).
+set_level(Target_level) ->
+	ets:insert(name(), {level(), Target_level}).
 
 
 % przeslanie stanu zaluzji do glownego watku
 send_message_to_main(Pid, Level) ->
 	receive
+		
 		after 1000 ->
 			Pid ! {Level}
 	end.
 
 
 % zmiana stanu zaluzji
-move(TargetLevel) ->
+move(Target_level) ->
 	receive
-		after 1000 ->
-			
-			if 
-				level > TargetLevel ->   
-					level = level - 6;
-					
-					if 
-						level < TargetLevel ->
-							level = TargetLevel
-					end;
-			   
+	after
+		100 ->
+			[{_, Val}] = ets:lookup(name(), blind_level),
 			if
-				level < TargetLevel ->
-					level = Level + 6;
-					
-					if 
-						level > TargetLevel ->
-							level = TargetLevel
-					end;
-					
-			move(TargetLevel)
-	
-  end.
-
-
-% glowna funkcja - sprawdzenie i zmiana stanu zaluzji
-check_and_move_level(TargetLevel, level) ->
-	if 
-		TargetLevel == level ->
-			io:write("Blinds are currently on that level");
-		
-		TargetLevel >= 0 -> 
-			io:write(""),
-			move(TargetLevel);
-	
-		true ->
-			io:fwrite("Enter blind level within the range (0 - 100)")
+				Val == Target_level ->
+					unit;
+				Val < Target_level ->
+					ets:insert(name(), {blind_level, Val + ?BLIND_CHANGE}),
+					move(Target_level);
+				true ->
+					ets:insert(name(), {blind_level, Val - ?BLIND_CHANGE}),
+					move(Target_level)
+			end
 	end.
+
 
 
